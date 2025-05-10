@@ -1,0 +1,98 @@
+import random
+import time
+import tracemalloc
+from typing import List, Set, Optional
+from collections import Counter
+
+Clause = Set[int]
+CNF = List[Clause]
+
+# -------------------------------
+# Manual CNF Input
+# -------------------------------
+def input_cnf() -> CNF:
+    cnf = []
+    num_clauses = int(input("Enter the number of clauses: "))
+    for i in range(num_clauses):
+        clause = input(f"Enter clause {i+1} as space-separated literals (e.g., '1 -2 3'): ")
+        clause_set = set(int(lit) for lit in clause.split())
+        cnf.append(clause_set)
+    return cnf
+
+# -------------------------------
+# DPLL Solver with Debug Output
+# -------------------------------
+def dpll_solver(cnf: CNF, assignment: Set[int], strategy: str = 'random') -> bool:
+    print(f"Current CNF: {cnf}")
+    print(f"Current assignment: {sorted(assignment)}")
+
+    if all(any(lit in assignment for lit in clause) for clause in cnf):
+        print("All clauses satisfied. SATISFIABLE.\n")
+        return True
+    if any(all(-lit in assignment for lit in clause) for clause in cnf):
+        print("Empty clause found. UNSATISFIABLE.\n")
+        return False
+
+    simplified = simplify_cnf(cnf, assignment)
+    variable = select_variable(simplified, strategy)
+    print(f"Choosing variable {variable} for assignment...")
+
+    # Try assigning the chosen variable to True
+    print(f"Trying {variable} = True...")
+    if dpll_solver(simplified, assignment | {variable}, strategy):
+        return True
+
+    # Try assigning the chosen variable to False
+    print(f"Trying {variable} = False...")
+    return dpll_solver(simplified, assignment | {-variable}, strategy)
+
+def simplify_cnf(cnf: CNF, assignment: Set[int]) -> CNF:
+    new_cnf = []
+    for clause in cnf:
+        if any(lit in assignment for lit in clause):
+            continue  # Clause already satisfied
+        new_clause = set(lit for lit in clause if -lit not in assignment)
+        new_cnf.append(new_clause)
+    return new_cnf
+
+def select_variable(cnf: CNF, strategy: str) -> int:
+    flat = [abs(lit) for clause in cnf for lit in clause]
+    if not flat:
+        return 1
+    if strategy == 'random':
+        return random.choice(flat)
+    elif strategy == 'most_frequent':
+        counts = Counter(flat)
+        return counts.most_common(1)[0][0]
+    elif strategy == 'first':
+        return flat[0]
+    return flat[0]
+
+# -------------------------------
+# Benchmarking Function
+# -------------------------------
+def benchmark_dpll(cnf: CNF, strategy: str):
+    print(f"Running DPLL Solver ({strategy})...\n")
+    start = time.time()
+    tracemalloc.start()
+    result = dpll_solver(cnf, set(), strategy)
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    end = time.time()
+    print(f"DPLL Solver ({strategy}) Summary:")
+    print(f"  Result       : {'SAT' if result else 'UNSAT'}")
+    print(f"  Time taken   : {round((end - start) * 1000, 2)} ms")
+    print(f"  Memory used  : {round(peak / 1024, 2)} KB\n")
+
+# -------------------------------
+# Main
+# -------------------------------
+if __name__ == '__main__':
+    cnf = [
+        {1, 2, 3},
+        {-1, -2, 3},
+        {1, -3, 4}
+    ]
+    benchmark_dpll(cnf, 'random')
+    benchmark_dpll(cnf, 'most_frequent')
+    benchmark_dpll(cnf, 'first')

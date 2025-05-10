@@ -1,0 +1,127 @@
+import random
+import time
+import tracemalloc
+from typing import List, Set
+
+Clause = Set[int]
+CNF = List[Clause]
+
+
+# -------------------------------
+# Simplify CNF Based on Assignment
+# -------------------------------
+def simplify_cnf(cnf: CNF, assignment: Set[int]) -> CNF:
+    new_cnf = []
+    for clause in cnf:
+        # If the clause is already satisfied, skip it
+        if any(lit in assignment for lit in clause):
+            continue
+
+        # Otherwise, remove literals that are false in the assignment
+        new_clause = {lit for lit in clause if -lit not in assignment}
+        new_cnf.append(new_clause)
+    return new_cnf
+
+
+# -------------------------------
+# Unit Propagation: Assign values to unit clauses
+# -------------------------------
+def unit_propagate(cnf: CNF) -> Set[int]:
+    unit_clauses = {frozenset(clause) for clause in cnf if len(clause) == 1}
+    units = {next(iter(clause)) for clause in unit_clauses}
+    return units
+
+
+# -------------------------------
+# DP Solver
+# -------------------------------
+def dp_solver(cnf: CNF, assignment: Set[int], depth: int = 0) -> bool:
+    print(f"\n--- Depth {depth} ---")
+    print(f"Current CNF: {cnf}")
+    print(f"Current assignment: {sorted(assignment)}")
+
+    # Base case: If CNF is empty, return True (all clauses satisfied)
+    if not cnf:
+        print("All clauses satisfied. SATISFIABLE.\n")
+        return True
+
+    # Base case: If any clause is empty, it's UNSAT
+    if any(len(clause) == 0 for clause in cnf):
+        print("Empty clause found. UNSATISFIABLE.\n")
+        return False
+
+    # Simplify CNF based on the current assignment
+    simplified_cnf = simplify_cnf(cnf, assignment)
+
+    # Apply unit propagation
+    units = unit_propagate(simplified_cnf)
+    print(f"Unit propagation found: {units}")
+    assignment.update(units)
+
+    # Simplify CNF again after applying unit propagation
+    simplified_cnf = simplify_cnf(simplified_cnf, units)
+    print(f"Simplified CNF after unit propagation: {simplified_cnf}")
+
+    # If no unit propagation occurred and CNF hasn't changed, continue with assignments
+    if simplified_cnf == cnf:
+        print("CNF has not changed after unit propagation.")
+
+    # Select a variable to assign based on strategy (naive here)
+    var = select_variable(simplified_cnf)
+    print(f"Selected variable: {var}")
+
+    # Try assigning the variable to True
+    print(f"Trying {var} = True...")
+    if dp_solver(simplified_cnf, assignment | {var}, depth + 1):
+        return True
+
+    # Try assigning the variable to False
+    print(f"Trying {var} = False...")
+    return dp_solver(simplified_cnf, assignment | {-var}, depth + 1)
+
+
+# -------------------------------
+# Select Variable for Assignment (Naive Approach)
+# -------------------------------
+def select_variable(cnf: CNF) -> int:
+    # Pick the first variable that appears in any clause (simplified for demonstration)
+    for clause in cnf:
+        for var in clause:
+            return var
+    return 0  # In case of empty CNF (shouldn't happen with proper logic)
+
+
+# -------------------------------
+# Benchmarking Function
+# -------------------------------
+def benchmark_dp(cnf: CNF):
+    print("Running DP Solver...\n")
+    start = time.time()
+    tracemalloc.start()
+    result = dp_solver(cnf, set())
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    end = time.time()
+    print("DP Solver Summary:")
+    print(f"  Result       : {'SAT' if result else 'UNSAT'}")
+    print(f"  Time taken   : {round((end - start) * 1000, 2)} ms")
+    print(f"  Memory used  : {round(peak / 1024, 2)} KB\n")
+
+
+# -------------------------------
+# Main
+# -------------------------------
+if __name__ == '__main__':
+    cnf = [
+        {1, 2, 3},
+        {-1, 4, 5},
+        {2, -3, 6},
+        {-2, 3, -5},
+        {1, -4, -6},
+        {-1, 2, 5},
+        {3, -4, -6},
+        {-1, -2, 6},
+        {4, 5, -6},
+        {2, -4, 3}
+    ]
+    benchmark_dp(cnf)

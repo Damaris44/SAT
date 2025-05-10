@@ -1,0 +1,78 @@
+import random
+import time
+import tracemalloc
+from typing import List, Set
+
+Clause = Set[int]
+CNF = List[Clause]
+
+# -------------------------------
+# Manual CNF Input
+# -------------------------------
+def input_cnf() -> CNF:
+    cnf = []
+    num_clauses = int(input("Enter the number of clauses: "))
+    for i in range(num_clauses):
+        clause = input(f"Enter clause {i+1} as space-separated literals (e.g., '1 -2 3'): ")
+        clause_set = set(int(lit) for lit in clause.split())
+        cnf.append(clause_set)
+    return cnf
+
+# -------------------------------
+# Resolution Solver with Debug Output
+# -------------------------------
+def resolution_solver(cnf: CNF) -> bool:
+    clauses = set(frozenset(c) for c in cnf)
+    new = set()
+    while True:
+        pairs = [(c1, c2) for c1 in clauses for c2 in clauses if c1 != c2]
+        for (c1, c2) in pairs:
+            resolvents = resolve(c1, c2)
+            if frozenset() in resolvents:
+                return False  # Unsatisfiable
+            new.update(resolvents)
+        if new.issubset(clauses):
+            return True  # Satisfiable
+        clauses.update(new)
+
+def resolve(c1: Clause, c2: Clause) -> Set[frozenset]:
+    result = set()
+    for lit in c1:
+        if -lit in c2:
+            new_clause = (c1 - {lit}) | (c2 - {-lit})
+            result.add(frozenset(new_clause))
+    return result
+
+# -------------------------------
+# Benchmarking Function
+# -------------------------------
+def benchmark_resolution(cnf: CNF):
+    print("Running Resolution Solver...\n")
+    start = time.time()
+    tracemalloc.start()
+    result = resolution_solver(cnf)
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    end = time.time()
+    print("Resolution Solver Summary:")
+    print(f"  Result       : {'SAT' if result else 'UNSAT'}")
+    print(f"  Time taken   : {round((end - start) * 1000, 2)} ms")
+    print(f"  Memory used  : {round(peak / 1024, 2)} KB\n")
+
+# -------------------------------
+# Main
+# -------------------------------
+if __name__ == '__main__':
+    cnf = [
+        {1, 2, 3},
+        {-1, 4, 5},
+        {2, -3, 6},
+        {-2, 3, -5},
+        {1, -4, -6},
+        {-1, 2, 5},
+        {3, -4, -6},
+        {-1, -2, 6},
+        {4, 5, -6},
+        {2, -4, 3}
+    ]
+    benchmark_resolution(cnf)
